@@ -2,8 +2,8 @@
 declare(strict_types=1);
 
 $year = 2025;
-$month = 7;
-$numberOfMonths = 3;
+$month = 2;
+$numberOfMonths = 4;
 
 // Функция проверки выходного дня
 function isWeekend(DateTime $date): bool {
@@ -63,6 +63,11 @@ function showWorkingDays(array $dates, DateTime $startDate): void {
             );
             echo PHP_EOL . "Название месяца: " . $currentMonthName . PHP_EOL;
             echo "Список дней месяца: " . PHP_EOL;
+            
+            // Сброс рабочего индекса при смене месяца
+            if ($index > $workDayIndex) {
+                $workDayIndex = $index;
+            }
         }
         
         $dayStr = $formatter->format($date->getTimestamp());
@@ -78,16 +83,21 @@ function showWorkingDays(array $dates, DateTime $startDate): void {
                 echo $dayStr . " +" . PHP_EOL;
                 $workDayIndex += 3;
             } else {
-                // Ищем следующий понедельник
-                while ($index < count($dates)) {
-                    $date = $dates[$index];
-                    if ((int)$date->format('N') === 1) {
-                        echo $formatter->format($date->getTimestamp()) . " +" . PHP_EOL;
-                        $workDayIndex = $index + 3;
+                // Ищем следующий понедельник (убрали проверку месяца)
+                $foundMonday = false;
+                for ($i = $index; $i < count($dates); $i++) {
+                    if ((int)$dates[$i]->format('N') === 1) {
+                        echo $formatter->format($dates[$i]->getTimestamp()) . " +" . PHP_EOL;
+                        $workDayIndex = $i + 3;
+                        $index = $i; // Перескакиваем на понедельник
+                        $foundMonday = true;
                         break;
                     }
-                    echo $formatter->format($date->getTimestamp()) . PHP_EOL;
-                    $index++;
+                    echo $formatter->format($dates[$i]->getTimestamp()) . PHP_EOL;
+                }
+                
+                if (!$foundMonday) {
+                    break; // Завершаем если понедельник не найден
                 }
             }
         } else {
