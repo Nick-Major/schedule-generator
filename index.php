@@ -3,47 +3,16 @@ declare(strict_types=1);
 
 $year = 2025;
 $month = 7;
+$numberOfMonths = 3;
 
-function isWeekend(string $day): bool {
-    return str_contains($day, 'суббота') || str_contains($day, 'воскресенье');
+// Функция проверки выходного дня
+function isWeekend(DateTime $date): bool {
+    return (int)$date->format('N') >= 6; // 6-суббота, 7-воскресенье
 }
 
-function showWorkingDays(array $days): void {
-    $workDayIndex = 0;
-    
-    foreach ($days as $index => $day) {
-        if ($index === $workDayIndex) {
-            if (!isWeekend($day)) {
-                echo $day . " +" . PHP_EOL;
-                $workDayIndex += 3;
-            } else {
-                echo $day . PHP_EOL;
-                
-                for ($i = $index + 1; $i < count($days); $i++) {
-                    if (str_contains($days[$i], 'понедельник')) {
-                        $workDayIndex = $i;
-                        break;
-                    };
-                };
-            };
-        } else {
-            echo $day . PHP_EOL;
-        };
-    };
-};
-
-function getSchedule(int $year, int $month) : void {
-    $date = new DateTime("$year-$month-01");
-    $formatter = new IntlDateFormatter(
-        'ru_RU',
-        IntlDateFormatter::FULL,
-        IntlDateFormatter::NONE,
-        'Europe/Moscow',
-        IntlDateFormatter::GREGORIAN,
-        'LLLL'
-    );
-
-    $listFormatter = new IntlDateFormatter(
+// Основной форматтер для вывода дат
+function createDateFormatter(): IntlDateFormatter {
+    return new IntlDateFormatter(
         'ru_RU',
         IntlDateFormatter::FULL,
         IntlDateFormatter::NONE,
@@ -51,21 +20,97 @@ function getSchedule(int $year, int $month) : void {
         IntlDateFormatter::GREGORIAN,
         'd MMMM Y, EEEE'
     );
+}
 
-    $daysInMonth = $date->format('t');
-    $listOfDays = [];
-    $currentDate = clone $date;
+// Форматтер только для названий месяцев
+function createMonthFormatter(): IntlDateFormatter {
+    return new IntlDateFormatter(
+        'ru_RU',
+        IntlDateFormatter::FULL,
+        IntlDateFormatter::NONE,
+        'Europe/Moscow',
+        IntlDateFormatter::GREGORIAN,
+        'LLLL'
+    );
+}
 
-    for ($i = 1; $i <= $daysInMonth; $i++) {
-        $listOfDays[] = $listFormatter->format($currentDate);
-        $currentDate->add(new DateInterval('P1D'));
-    };
+function showWorkingDays(array $dates, DateTime $startDate): void {
+    $formatter = createDateFormatter();
+    $monthFormatter = createMonthFormatter();
     
-    $russianMonth = mb_convert_case($formatter->format($date), MB_CASE_TITLE, 'UTF-8');
-
-    echo "Название месяца: " . $russianMonth . PHP_EOL;
+    $workDayIndex = 0;
+    $currentMonth = $startDate->format('m');
+    $currentMonthName = mb_convert_case(
+        $monthFormatter->format($startDate), 
+        MB_CASE_TITLE, 
+        'UTF-8'
+    );
+    
+    echo "Название месяца: " . $currentMonthName . PHP_EOL;
     echo "Список дней месяца: " . PHP_EOL;
-    showWorkingDays($listOfDays);
-};
+    
+    for ($index = 0; $index < count($dates); $index++) {
+        $date = $dates[$index];
+        $month = $date->format('m');
+        
+        // При смене месяца
+        if ($month !== $currentMonth) {
+            $currentMonth = $month;
+            $currentMonthName = mb_convert_case(
+                $monthFormatter->format($date), 
+                MB_CASE_TITLE, 
+                'UTF-8'
+            );
+            echo PHP_EOL . "Название месяца: " . $currentMonthName . PHP_EOL;
+            echo "Список дней месяца: " . PHP_EOL;
+        }
+        
+        $dayStr = $formatter->format($date->getTimestamp());
+        
+        if ($index === 0) {
+            echo $dayStr . " +" . PHP_EOL;
+            $workDayIndex += 3;
+            continue;
+        }
 
-getSchedule($year, $month);
+        if ($index === $workDayIndex) {
+            if (!isWeekend($date)) {
+                echo $dayStr . " +" . PHP_EOL;
+                $workDayIndex += 3;
+            } else {
+                // Ищем следующий понедельник
+                while ($index < count($dates)) {
+                    $date = $dates[$index];
+                    if ((int)$date->format('N') === 1) {
+                        echo $formatter->format($date->getTimestamp()) . " +" . PHP_EOL;
+                        $workDayIndex = $index + 3;
+                        break;
+                    }
+                    echo $formatter->format($date->getTimestamp()) . PHP_EOL;
+                    $index++;
+                }
+            }
+        } else {
+            echo $dayStr . PHP_EOL;
+        }
+    }
+}
+
+function getSchedule(int $year, int $month, int $numberOfMonths): void {
+    $startDate = new DateTime("$year-$month-01");
+    $endDate = (new DateTime("$year-$month-01"))
+        ->add(new DateInterval("P{$numberOfMonths}M"));
+    
+    $dates = [];
+    $currentDate = clone $startDate;
+    
+    while ($currentDate < $endDate) {
+        $dates[] = clone $currentDate;
+        $currentDate->add(new DateInterval('P1D'));
+    }
+    
+    showWorkingDays($dates, $startDate);
+}
+
+// Запуск
+getSchedule($year, $month, $numberOfMonths);
